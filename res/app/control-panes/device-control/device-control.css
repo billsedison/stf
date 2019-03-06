@@ -279,3 +279,16 @@ device-screen input {
   -ms-transition: none !important;
   transition: none !important;
 }
+
+.ios-screen{
+  height: 100%;
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+}
+.ios-screen-video{
+  position: absolute;
+}

@@ -13,6 +13,11 @@ module.exports = function GroupServiceFactory(
       return Promise.reject(new Error('Device is not usable'))
     }
 
+
+    if (device && device.platform === 'iOS') {
+      return Promise.resolve(device)
+    }
+
     var tx = TransactionService.create(device)
     socket.emit('group.invite', device.channel, tx.channel, {
       requirements: {
@@ -34,6 +39,10 @@ module.exports = function GroupServiceFactory(
   groupService.kick = function(device, force) {
     if (!force && !device.usable) {
       return Promise.reject(new Error('Device is not usable'))
+    }
+
+    if (device && device.platform === 'iOS') {
+      return Promise.resolve(device)
     }
 
     var tx = TransactionService.create(device)

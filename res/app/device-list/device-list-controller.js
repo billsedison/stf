@@ -7,7 +7,7 @@ module.exports = function DeviceListCtrl(
 , GroupService
 , ControlService
 , SettingsService
-, $location
+, $location, $interval
 ) {
   $scope.tracker = DeviceService.trackAll($scope)
   $scope.control = ControlService.create($scope.tracker.devices, '*ALL')
@@ -201,4 +201,20 @@ module.exports = function DeviceListCtrl(
     $scope.sort = defaultSort
     $scope.columns = defaultColumns
   }
+
+  /**
+   * mock ios online and offline event
+   */
+  var timer = $interval(function() {
+    DeviceService.getAll().then(devices => {
+      _.each(_.filter(devices, device => device.platform === 'iOS'), device => {
+        $scope.tracker.change(device)
+      })
+    })
+  }, 1000)
+
+  $scope.$on('$destroy', function() {
+    // remove timer
+    $interval.cancel(timer)
+  })
 }

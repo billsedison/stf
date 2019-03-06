@@ -34,9 +34,13 @@ module.exports = function DeviceListDetailsDirective(
 
 
       function kickDevice(device, force) {
-        return GroupService.kick(device, force).catch(function(e) {
-          alert($filter('translate')(gettext('Device cannot get kicked from the group')))
-          throw new Error(e)
+        return DeviceService.get(device.serial, scope, 'action,kick').then(d => {
+          return GroupService.kick(d, force).then(()=>{
+            tracker.change(d)
+          }).catch(function(e) {
+            alert($filter('translate')(gettext('Device cannot get kicked from the group')))
+            throw new Error(e)
+          })
         })
       }
 

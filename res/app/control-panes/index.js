@@ -39,6 +39,7 @@ module.exports = angular.module('control-panes', [
       })
   }])
   .factory('ControlPanesService', require('./control-panes-service'))
+  .factory('IOSService', require('./device-control/ios/ios-service'))
   .controller('ControlPanesCtrl', require('./control-panes-controller'))
   .controller('ControlPanesNoDeviceController',
   require('./control-panes-no-device-controller'))

@@ -1,6 +1,11 @@
 var _ = require('lodash')
+var flvjs = require('flv.js')
+var GestureRecognizer = require('./ios/gesture_recognizer')
 
-module.exports = function DeviceControlCtrl($scope, DeviceService, GroupService,
+var VIDEO_ID = 'ios-screen-video'
+var VIODE_CONTAINER_ID = 'ios-screen-container'
+
+module.exports = function DeviceControlCtrl($scope, DeviceService, GroupService, IOSService,
   $location, $timeout, $window, $rootScope) {
 
   $scope.showScreen = true
@@ -8,12 +13,30 @@ module.exports = function DeviceControlCtrl($scope, DeviceService, GroupService,
   $scope.groupTracker = DeviceService.trackGroup($scope)
 
   $scope.groupDevices = $scope.groupTracker.devices
+  $scope._gestureRecognizer = null
 
   $scope.kickDevice = function(device) {
 
     if (!device || !$scope.device) {
       alert('No device found')
       return
+    }
+
+    /**
+     * kick device, wrap it to support ios
+     * @param device the device entry
+     * @returns {*}
+     */
+    var kick = function(device) {
+
+      if (device.platform === 'iOS') {
+        return DeviceService.get(device.serial, $scope, 'action,kick').then(d => {
+          return GroupService.kick(d)
+        })
+      }
+      else {
+        return GroupService.kick(device)
+      }
     }
 
     try {
@@ -30,18 +53,18 @@ module.exports = function DeviceControlCtrl($scope, DeviceService, GroupService,
           $scope.controlDevice(firstFreeDevice)
 
           // Then kick the old device
-          GroupService.kick(device).then(function() {
+          kick(device).then(function() {
             $scope.$digest()
           })
         } else {
           // Kick the device
-          GroupService.kick(device).then(function() {
+          kick(device).then(function() {
             $scope.$digest()
           })
           $location.path('/devices/')
         }
       } else {
-        GroupService.kick(device).then(function() {
+        kick(device).then(function() {
           $scope.$digest()
         })
       }
@@ -130,6 +153,150 @@ module.exports = function DeviceControlCtrl($scope, DeviceService, GroupService,
 
     if ($rootScope.standalone) {
       $window.resizeTo($window.outerHeight, $window.outerWidth)
+    }
+  }
+
+  /**
+   * check device is ios device or not
+   * @returns {boolean} the result
+   */
+  $scope.isIOS = function() {
+    if ($scope.device && $scope.device.platform) {
+      return $scope.device.platform === 'iOS'
+    }
+    return false
+  }
+
+  /**
+   * resize video size
+   */
+  function resizeVideo() {
+    var containerEle = document.getElementById(VIODE_CONTAINER_ID)
+    var videoEle = document.getElementById(VIDEO_ID)
+    if (!containerEle || !videoEle) {
+      return
+    }
+
+    var sx = containerEle.offsetWidth / videoEle.offsetWidth
+    var sy = containerEle.offsetHeight / videoEle.offsetHeight
+    var scale = Math.min(sx, sy)
+    videoEle.style.transform = `scale(${scale})`
+  }
+
+  /**
+   * load video
+   * @param device the ios device
+   */
+  function loadVideo(device) {
+    if (flvjs.isSupported()) {
+      var videoElement = document.getElementById(VIDEO_ID)
+      videoElement.style.transform = 'scale(0.5)'
+      var flvPlayer = flvjs.createPlayer({
+        type: 'flv',
+        isLive: true,
+        url: device.stream,
+      }, {
+        enableStashBuffer: false,
+        lazyLoad: false,
+        fixAudioTimestampGap: false,
+        enableWorker: true
+      })
+      flvPlayer.attachMediaElement(videoElement)
+      flvPlayer.load()
+      flvPlayer.play()
+
+      setTimeout(() => resizeVideo(), 300)
+    }
+  }
+
+  /**
+   * watch device, when device loaded
+   */
+  $scope.$watch('device', function(newDevice) {
+    if (newDevice && newDevice.platform === 'iOS') {
+      IOSService.getStatus(newDevice).then(() => {
+        loadVideo(newDevice)
+      })
+    }
+  })
+
+  /**
+   * watch container width resize, then the video also need resize
+   */
+  $scope.$watch(function() {
+    var ele = document.getElementById(VIODE_CONTAINER_ID)
+    if (!ele) {
+      return 0
+    }
+    return ele.offsetWidth
+  }, function(newVal) {
+    if (newVal <= 0) {
+      return
+    }
+    resizeVideo()
+  })
+
+  /**
+   * return ios gesture
+   * @returns {null|GestureRecognizer} the gesture object
+   */
+  function gestureRecognizer()
+  {
+    if (!$scope._gestureRecognizer) {
+      $scope._gestureRecognizer = new GestureRecognizer({
+        onClick: (point) => {
+          IOSService.tap($scope.device, point.x, point.y)
+        },
+        onDrag: (params) => {
+          IOSService.drag($scope.device, params.origin.x, params.origin.y, params.end.x,
+            params.end.y, params.duration)
+        },
+        onKeyDown: (key) => {
+          IOSService.key($scope.device, key)
+        },
+      })
+    }
+    return $scope._gestureRecognizer
+  }
+
+  /**
+   * on mouse down event
+   * @param ev the event
+   */
+  $scope.onIOSMouseDown = function(ev) {
+    gestureRecognizer().onMouseDown(ev)
+  }
+
+  /**
+   * on mouse move event
+   * @param ev the event
+   */
+  $scope.onIOSMouseMove = function(ev) {
+    gestureRecognizer().onMouseMove(ev)
+  }
+
+  /**
+   * on mouse up event
+   * @param ev the event
+   */
+  $scope.onIOSMouseUp = function(ev) {
+    gestureRecognizer().onMouseUp(ev)
+  }
+
+  /**
+   * on keyboard down event
+   * @param ev the event
+   */
+  $scope.onIOSKeyDown = function(ev) {
+    gestureRecognizer().onKeyDown(ev)
+  }
+
+  /**
+   * ios goto home page
+   */
+  $scope.gotoHome = function() {
+    if ($scope.isIOS()) {
+      IOSService.home($scope.device)
     }
   }
 
