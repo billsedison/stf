@@ -57,6 +57,11 @@ device-screen canvas.screen {
   transform: rotate(0deg);
 }
 
+device-screen #screenshot{
+  pointer-events: none;
+  position: absolute;
+}
+
 device-screen .positioner .hacky-stretcher {
   outline: 1px solid red;
   height: 100%;
@@ -74,6 +79,9 @@ device-screen/*.portrait*/ .positioner {
   right: 0;
   bottom: 0;
   left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 device-screen/*.portrait*/ canvas.screen {
@@ -199,6 +207,9 @@ device-screen input {
 }
 
 /* VNC buttons */
+.stf-vnc-bottom .controls {
+  height: 46px;
+}
 .stf-vnc-bottom .btn-primary:hover {
   background: rgba(255, 255, 255, 1.0);
   border: none;
@@ -278,17 +289,4 @@ device-screen input {
   -o-transition: none !important;
   -ms-transition: none !important;
   transition: none !important;
-}
-
-.ios-screen{
-  height: 100%;
-  width: 100%;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-}
-.ios-screen-video{
-  position: absolute;
 }

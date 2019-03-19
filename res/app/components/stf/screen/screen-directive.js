@@ -1,6 +1,9 @@
 var _ = require('lodash')
 var rotator = require('./rotator')
 var ImagePool = require('./imagepool')
+var flvjs = require('flv.js')
+
+const IOS_VIODE_ID = 'screenshot'
 
 module.exports = function DeviceScreenDirective(
   $document
@@ -24,8 +27,9 @@ module.exports = function DeviceScreenDirective(
       var cssTransform = VendorUtil.style(['transform', 'webkitTransform'])
 
       var device = scope.device()
+      scope.deviceType = device.platform
+      var isIOS = device.platform === 'iOS'
       var control = scope.control()
-
       var input = element.find('input')
 
       var screen = scope.screen = {
@@ -43,6 +47,8 @@ module.exports = function DeviceScreenDirective(
       , device.display.height
       )
 
+      var flvPlayer = null
+
       /**
        * SCREEN HANDLING
        *
@@ -51,12 +57,106 @@ module.exports = function DeviceScreenDirective(
       ;(function() {
         function stop() {
           try {
-            ws.onerror = ws.onclose = ws.onmessage = ws.onopen = null
-            ws.close()
-            ws = null
+            if(device.platform === 'iOS') {
+              if(flvPlayer) {
+                flvPlayer.pause()
+                flvPlayer.unload()
+                flvPlayer.detachMediaElement()
+                flvPlayer.destroy()
+                flvPlayer = null
+              }
+            } else {
+              ws.onerror = ws.onclose = ws.onmessage = ws.onopen = null
+              ws.close()
+              ws = null
+            }
           }
           catch (err) { /* noop */ }
         }
+
+        var canvasAspect = 1
+        var parentAspect = 1
+
+        function resizeListener() {
+          parentAspect = element[0].offsetWidth / element[0].offsetHeight
+          if (isIOS) {
+            var videoElement = document.getElementById('screenshot')
+            canvasAspect = videoElement.offsetWidth / videoElement.offsetHeight
+            resizeIOSVideo()
+          }
+          else {
+            maybeFlipLetterbox()
+          }
+        }
+
+        function resizeIOSVideo() {
+          var containerEle = element[0]
+          var videoEle = document.getElementById('screenshot')
+          if (!containerEle || !videoEle) {
+            return
+          }
+          var sx = containerEle.offsetWidth / videoEle.offsetWidth
+          var sy = containerEle.offsetHeight / videoEle.offsetHeight
+          var scale = Math.min(sx, sy)
+          videoEle.style.transform = `scale(${scale})`
+        }
+
+
+        function maybeFlipLetterbox() {
+          element[0].classList.toggle(
+            'letterboxed', parentAspect < canvasAspect)
+        }
+
+        $window.addEventListener('resize', resizeListener, false)
+        scope.$on('fa-pane-resize', resizeListener)
+
+        resizeListener()
+
+        scope.$on('$destroy', function() {
+          stop()
+          $window.removeEventListener('resize', resizeListener, false)
+        })
+
+
+        if(isIOS) {
+          loadIOSVideo()
+          var videoElement = document.getElementById(IOS_VIODE_ID)
+          scope.$watch('$parent.showScreen', () => {
+            if (!scope.$parent.showScreen) {
+              videoElement.style.display = 'none'
+            }
+            else {
+              videoElement.style.display = ''
+            }
+          })
+          return
+        }
+        function loadIOSVideo() {
+          if (flvjs && flvjs.isSupported()) {
+            var videoElement = document.getElementById(IOS_VIODE_ID)
+            videoElement.style.transform = 'scale(0.3)'
+            var flvPlayer = flvjs.createPlayer({
+              type: 'flv',
+              isLive: true,
+              hasAudio: false,
+              url: 'http://localhost:8000/live/stream.flv',
+            }, {
+              enableStashBuffer: false,
+              lazyLoad: false,
+              fixAudioTimestampGap: false,
+              enableWorker: true
+            })
+            flvPlayer.attachMediaElement(videoElement)
+            flvPlayer.load()
+            flvPlayer.play()
+
+            flvPlayer.on(flvjs.Events.METADATA_ARRIVED, () => {
+              setTimeout(() => resizeListener(), 100)
+            })
+            setTimeout(() => resizeListener(), 100)
+          }
+        }
+
 
         var ws = new WebSocket(device.display.url)
         ws.binaryType = 'blob'
@@ -370,28 +470,6 @@ module.exports = function DeviceScreenDirective(
           control.rotate(90)
         })
 
-        var canvasAspect = 1
-        var parentAspect = 1
-
-        function resizeListener() {
-          parentAspect = element[0].offsetWidth / element[0].offsetHeight
-          maybeFlipLetterbox()
-        }
-
-        function maybeFlipLetterbox() {
-          element[0].classList.toggle(
-            'letterboxed', parentAspect < canvasAspect)
-        }
-
-        $window.addEventListener('resize', resizeListener, false)
-        scope.$on('fa-pane-resize', resizeListener)
-
-        resizeListener()
-
-        scope.$on('$destroy', function() {
-          stop()
-          $window.removeEventListener('resize', resizeListener, false)
-        })
       })()
 
       /**
@@ -559,6 +637,14 @@ module.exports = function DeviceScreenDirective(
         }
 
         function calculateBounds() {
+
+          if (isIOS) {
+            var ele = document.getElementById('screen-container')
+            scaler = ScalingService.coordinator(
+              ele.offsetWidth
+              , ele.offsetHeight
+            )
+          }
           var el = element[0]
 
           screen.bounds.w = el.offsetWidth

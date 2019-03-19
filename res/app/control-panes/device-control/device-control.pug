@@ -44,25 +44,16 @@
         div(ng-controller='DeviceScreenCtrl', ng-if='device').as-cell.fill-height
           div(ng-file-drop='installFile($files)', ng-file-drag-over-class='dragover').fill-height
             device-context-menu(device='device', control='control')
-
-              device-screen(device='device', control='control' ng-if='device.platform !== "iOS"')
-
-              div(ng-if='device.platform === "iOS"', ng-show="showScreen" id='ios-screen-container').ios-screen
-                video(id='ios-screen-video', draggable=false, autoplay=true, muted=true,
-                ng-mousedown="onIOSMouseDown($event)"
-                ng-mousemove="onIOSMouseMove($event)"
-                ng-mouseup="onIOSMouseUp($event)"
-                ng-style="{width:320,height:480}"
-                ng-keydown="onIOSKeyDown($event)").ios-screen-video
+              device-screen(device='device', control='control')
 
       .stf-vnc-bottom.as-row(ng-hide='$root.standalone')
         .controls.as-cell
           .btn-group.btn-group-justified
-            a(device-control-key='menu', title='{{"Menu"|translate}}', ng-if='!isIOS()').btn.btn-primary.btn-lg.no-transition
+            a(device-control-key='menu', title='{{"Menu"|translate}}', ng-if='device.platform!=="iOS"').btn.btn-primary.btn-lg.no-transition
               i.fa.fa-bars
-            a(device-control-key='home', title='{{"Home"|translate}}' ng-click="gotoHome()").btn.btn-primary.btn-lg.no-transition
+            a(device-control-key='home', title='{{"Home"|translate}}').btn.btn-primary.btn-lg.no-transition
               i.fa.fa-home
-            a(device-control-key='app_switch', title='{{"App switch"|translate}}' ng-if='!isIOS()').btn.btn-primary.btn-lg.no-transition
+            a(device-control-key='app_switch', title='{{"App switch"|translate}}', ng-if='device.platform!=="iOS"').btn.btn-primary.btn-lg.no-transition
               i.fa.fa-square-o
-            a(device-control-key='back', title='{{"Back"|translate}}' ng-if='!isIOS()').btn.btn-primary.btn-lg.no-transition
+            a(device-control-key='back', title='{{"Back"|translate}}', ng-if='device.platform!=="iOS"').btn.btn-primary.btn-lg.no-transition
               i.fa.fa-mail-reply

@@ -5,6 +5,10 @@ var EventEmitter = require('eventemitter3')
 module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceService) {
   var deviceService = {}
 
+  function fetchIOSDevice(device) {
+    return $http.get('http://' + device.serial + ':8100/device');
+  }
+
   function Tracker($scope, options) {
     var devices = []
     var devicesBySerial = Object.create(null)
@@ -102,30 +106,75 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
         .then(function(device) {
           return changeListener({
             important: true
-          , data: device
+            , data: device
           })
         })
-        .catch(function() {})
+        .catch(function() { })
     }
 
     function addListener(event) {
       var device = get(event.data)
       if (device) {
-        modify(device, event.data)
-        notify(event)
+        if (device.platform === 'iOS') {
+          fetchIOSDevice(device)
+            .then(function(response) {
+              device.ready = true
+              device.present = true
+              device.usable = true
+              device.version = response.data.version
+              event.data.ready = true
+              event.data.present = true
+              event.data.usable = true
+              event.data.version = response.data.version
+              modify(device, event.data)
+              notify(event)
+            }).catch(() => {
+              device.ready = false
+              device.present = false
+              device.usable = false
+              event.data.ready = false
+              event.data.present = false
+              event.data.usable = false
+              modify(device, event.data)
+              notify(event)
+            })
+        } else {
+          modify(device, event.data)
+          notify(event)
+        }
       }
       else {
         if (options.filter(event.data)) {
-          insert(event.data)
-          notify(event)
+          if (event.data.platform === 'iOS') {
+            fetchIOSDevice(event.data)
+              .then(function(response) {
+                event.data.ready = true
+                event.data.present = true
+                event.data.usable = true
+                event.data.version = response.data.version
+                setTimeout(() => {
+                  insert(event.data)
+                  notify(event)
+                }, 100)
+              }).catch(() => {
+              event.data.ready = false
+              event.data.present = false
+              event.data.usable = false
+              setTimeout(() => {
+                insert(event.data)
+                notify(event)
+              }, 100)
+            })
+          }
+          else {
+            insert(event.data)
+            notify(event)
+          }
         }
       }
     }
 
     function changeListener(event) {
-      if (!event.data || !event.data.serial) {
-        return
-      }
       var device = get(event.data)
       if (device) {
         modify(device, event.data)
@@ -151,21 +200,10 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
     this.add = function(device) {
       addListener({
         important: true
-      , data: device
+        , data: device
       })
     }
 
-    /**
-     * update ios device state
-     * @param device the device entry
-     */
-    this.change = function(device) {
-      if (device.platform === 'iOS') {
-        var originDevice = get(device)
-        modify(originDevice, device)
-        notify({important: true, data: device})
-      }
-    }
     this.devices = devices
   }
 
@@ -176,12 +214,35 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
       filter: function() {
         return true
       }
-    , digest: false
+      , digest: false
     })
 
     oboe('/api/v1/devices')
       .node('devices[*]', function(device) {
-        tracker.add(device)
+        // if it is a iOS device
+        if (device.platform !== 'Android') {
+          device.platform = 'iOS'
+
+          $http.get('http://' + device.serial + ':8100/' + 'status')
+            .then(function(res) {
+              device.ready = true
+              device.present = true
+              device.usable = true
+              device.display = {
+                width: res.data.value.screen.width,
+                height: res.data.value.screen.height
+              }
+              tracker.add(device)
+            }).catch(err => {
+              device.ready = false
+              device.present = false
+              device.usable = false
+              tracker.add(device)
+            })
+        }
+        else {
+          tracker.add(device)
+        }
       })
 
     return tracker
@@ -192,7 +253,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
       filter: function(device) {
         return device.using
       }
-    , digest: true
+      , digest: true
     })
 
     oboe('/api/v1/user/devices')
@@ -203,22 +264,37 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
     return tracker
   }
 
-
-  deviceService.getAll = function() {
-    return $http.get('/api/v1/devices/')
+  deviceService.load = function(serial) {
+    return $http.get('/api/v1/devices/' + serial)
       .then(function(response) {
-        return response.data.devices
+        var device = response.data.device
+        if (device.platform !== 'Android') {
+          device.platform = 'iOS'
+          // return Promise.resolve(device)
+          return new Promise((resolve, reject) => {
+            device.platform = 'iOS'
+            fetchIOSDevice(device)
+              .then(function(res) {
+                device.ready = true
+                device.present = true
+                device.usable = true
+                device.display = {
+
+                }
+                resolve(device)
+              }).catch(err => {
+                device.ready = false
+                device.present = false
+                device.usable = false
+              })
+          })
+        } else {
+          return response.data.device
+        }
       })
   }
 
-  deviceService.load = function(serial, fields) {
-    return $http.get('/api/v1/devices/' + serial + '?fields=' + fields)
-      .then(function(response) {
-        return response.data.device
-      })
-  }
-
-  deviceService.get = function(serial, $scope, fields) {
+  deviceService.get = function(serial, $scope) {
     var tracker = new Tracker($scope, {
       filter: function(device) {
         return device.serial === serial
@@ -226,7 +302,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
       , digest: true
     })
 
-    return deviceService.load(serial, fields)
+    return deviceService.load(serial)
       .then(function(device) {
         tracker.add(device)
         return device

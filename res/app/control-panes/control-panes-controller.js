@@ -59,14 +59,13 @@ module.exports =
 
     // TODO: Move this out to Ctrl.resolve
     function getDevice(serial) {
-      DeviceService.get(serial, $scope, 'action,invite')
-        .then(function(device) {
-          return GroupService.invite(device)
-        })
-        .then(function(device) {
+      DeviceService.get(serial, $scope)
+        .then(function (device) {
           $scope.device = device
           $scope.control = ControlService.create(device, device.channel)
-
+          return GroupService.invite(device)
+        })
+        .then(function (device) {
           // TODO: Change title, flickers too much on Chrome
           // $rootScope.pageTitle = device.name
 
@@ -74,8 +73,8 @@ module.exports =
 
           return device
         })
-        .catch(function() {
-          $timeout(function() {
+        .catch(err => function () {
+          $timeout(function () {
             $location.path('/')
           })
         })
@@ -83,7 +82,7 @@ module.exports =
 
     getDevice($routeParams.serial)
 
-    $scope.$watch('device.state', function(newValue, oldValue) {
+    $scope.$watch('device.state', function (newValue, oldValue) {
       if (newValue !== oldValue) {
         if (oldValue === 'using') {
           FatalMessageService.open($scope.device, false)

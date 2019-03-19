@@ -1,3 +1,8 @@
+var _ = require('lodash')
+
+var iosPoints = {}
+var cacheSession = {}
+
 module.exports = function ControlServiceFactory(
   $upload
 , $http
@@ -11,8 +16,132 @@ module.exports = function ControlServiceFactory(
   }
 
   function ControlService(target, channel) {
+    var iOSHost = 'http://' + target.serial + ':8100/'
+    var actions = []
+
+
     function sendOneWay(action, data) {
-      socket.emit(action, channel, data)
+      if(target.platform === 'iOS') {
+
+        var getStatus = function() {
+          if (cacheSession[iOSHost]) {
+            return Promise.resolve(cacheSession[iOSHost])
+          }
+          return $http.get(iOSHost + 'status').then(ret => {
+            cacheSession[iOSHost] = ret.data.sessionId
+            return cacheSession[iOSHost]
+          })
+        }
+
+        var rootContainer = document.getElementById('screen-container')
+        var videoEle = document.getElementById('screenshot')
+        var cordConvert = (p) => {
+          var scale = videoEle.style.transform.substr('scale('.length)
+          scale = scale.substr(0, scale.length - 1)
+          scale = parseFloat(scale)
+          var offsetX = (rootContainer.offsetWidth - videoEle.offsetWidth * scale) * 0.5
+          var offsetY = (rootContainer.offsetHeight - videoEle.offsetHeight * scale) * 0.5
+          var ret = {
+            x: (p.x * rootContainer.offsetWidth - offsetX) / scale,
+            y: (p.y * rootContainer.offsetHeight - offsetY) / scale,
+          }
+          if (ret.x < 0) {
+            ret.x = 0
+          }
+          if (ret.x > videoEle.offsetWidth) {
+            ret.x = videoEle.offsetWidth
+          }
+          if (ret.y < 0) {
+            ret.y = 0
+          }
+          if (ret.y > videoEle.offsetHeight) {
+            ret.y = videoEle.offsetHeight
+          }
+          return ret
+        }
+
+        var tap = function(data, pIndex) {
+          var p = cordConvert(data)
+          getStatus().then(sessionId => {
+            $http.post(iOSHost + 'session/' + sessionId + '/wda/tap/' + pIndex,
+              JSON.stringify(p), {
+                headers: {'Content-Type': 'text/plain'}
+              })
+          })
+        }
+
+        var drag = function(d1, d2, duration, pIndex) {
+          var fp = cordConvert(d1)
+          var ep = cordConvert(d2)
+          getStatus().then(sessionId => {
+            $http.post(iOSHost + 'session/' +
+              sessionId + `/wda/element/${pIndex}/dragfromtoforduration`,
+              JSON.stringify({
+                fromX: fp.x,
+                fromY: fp.y,
+                toX: ep.x,
+                toY: ep.y,
+                duration: duration,
+              }), {
+                headers: {'Content-Type': 'text/plain'}
+              })
+          })
+        }
+
+        if(action === 'input.keyDown' && data) {
+          if(data.key === 'home') {
+            $http.post(iOSHost + 'wda/homescreen')
+          } else if (data.key === 'enter' || data.key === 'del') {
+            $http.get(iOSHost + 'status').then(ret => {
+              var sessionId = ret.data.sessionId
+              $http.post(iOSHost + 'session/' + sessionId + '/wda/keys',
+                JSON.stringify({
+                  value: [data.key === 'enter' ? '\u000d' : '\u007F']
+                }), {
+                  headers: {'Content-Type': 'text/plain'}
+                })
+            })
+          }
+        }
+
+        var pointIndex = data.contact
+        if (action === 'input.touchDown') {
+          iosPoints[pointIndex] = {
+            p: Object.assign({}, data, {timestamp: Date.now()}),
+            e: null,
+            isMoving: false,
+            over: false,
+          }
+        }
+        else if (action === 'input.touchMove') {
+          iosPoints[pointIndex].isMoving = true
+          iosPoints[pointIndex].e = Object.assign({}, data, {timestamp: Date.now()})
+        }
+        else if (action === 'input.touchUp') {
+          var size = _.size(iosPoints)
+          if (size <= 1) {
+            if (!iosPoints[pointIndex].isMoving) {
+              tap(iosPoints[pointIndex].p, pointIndex)
+            }
+            else if (iosPoints[pointIndex].p && iosPoints[pointIndex].e) {
+              var p = iosPoints[pointIndex].p
+              var e = iosPoints[pointIndex].e
+              drag(p, e, (e.timestamp - p.timestamp) / 1000, pointIndex)
+            }
+            iosPoints[pointIndex] = {}
+          }
+          else {
+            iosPoints[pointIndex].over = true
+            var left = _.filter(iosPoints, pp => pp.over)
+            if (left.length === size) {
+              // TODO here process ios multiple drag
+              iosPoints = {}
+            }
+          }
+        }
+      } else {
+        socket.emit(action, channel, data)
+      }
     }
 
     function sendTwoWay(action, data) {
@@ -297,6 +426,8 @@ module.exports = function ControlServiceFactory(
   }
 
   controlService.create = function(target, channel) {
+    cacheSession = {}
+    iosPoints = {}
     return new ControlService(target, channel)
   }
 

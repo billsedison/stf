@@ -41,6 +41,7 @@
     "basic-auth": "^1.0.3",
     "bluebird": "^2.10.1",
     "body-parser": "^1.13.3",
+    "bonjour": "^3.5.0",
     "bufferutil": "^1.2.1",
     "chalk": "~1.1.1",
     "compression": "^1.5.2",
