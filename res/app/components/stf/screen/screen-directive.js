@@ -139,7 +139,7 @@ module.exports = function DeviceScreenDirective(
               type: 'flv',
               isLive: true,
               hasAudio: false,
-              url: 'http://localhost:8000/live/stream.flv',
+              url: 'ws://localhost:8000/live/stream.flv',
             }, {
               enableStashBuffer: false,
               lazyLoad: false,

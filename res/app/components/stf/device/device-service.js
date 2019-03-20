@@ -6,7 +6,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
   var deviceService = {}
 
   function fetchIOSDevice(device) {
-    return $http.get('http://' + device.serial + ':8100/device');
+    return $http.get('http://' + device.host + ':8100/device')
   }
 
   function Tracker($scope, options) {
@@ -222,8 +222,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
         // if it is a iOS device
         if (device.platform !== 'Android') {
           device.platform = 'iOS'
-
-          $http.get('http://' + device.serial + ':8100/' + 'status')
+          $http.get('http://' + device.host + ':8100/status')
             .then(function(res) {
               device.ready = true
               device.present = true
