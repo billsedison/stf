@@ -19,9 +19,16 @@ module.exports = function ControlServiceFactory(
 
     function sendOneWay(action, data) {
       if(target.platform === 'iOS') {
-
+        target.display = target.display || {}
+        target.display.rotation = target.display.rotation || 0
         var isLandscape = function() {
-          return target && target.display && target.display.rotation === 90
+          return target && target.display && (
+            target.display.rotation === 90 || target.display.rotation === 270
+          )
+        }
+
+        var isIpad = function() {
+          return target && target.product && target.product.indexOf('iPad') >= 0
         }
 
         var getStatus = function() {
@@ -60,6 +67,24 @@ module.exports = function ControlServiceFactory(
           }
           if (ret.y > vh) {
             ret.y = vh
+          }
+
+          if (target.display.rotation === 180) { // revert y
+            ret.y = vh - ret.y
+            ret.x = vw - ret.x
+          }
+          else if (target.display.rotation === 90 || target.display.rotation === 270) {
+            if (isIpad()) {
+              var t = ret.x
+              ret.x = ret.y
+              ret.y = t
+              if (target.display.rotation === 90) {
+                ret.x = vh - ret.x
+              }
+              else {
+                ret.y = vw - ret.y
+              }
+            }
           }
           return ret
         }
