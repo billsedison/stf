@@ -77,11 +77,20 @@ module.exports = function DeviceScreenDirective(
         var canvasAspect = 1
         var parentAspect = 1
 
+        function isLandscape() {
+          return device && device.display && device.display.rotation === 90
+        }
+
         function resizeListener() {
           parentAspect = element[0].offsetWidth / element[0].offsetHeight
           if (isIOS) {
             var videoElement = document.getElementById('screenshot')
-            canvasAspect = videoElement.offsetWidth / videoElement.offsetHeight
+            if (isLandscape()) {
+              canvasAspect = videoElement.offsetHeight / videoElement.offsetWidth
+            }
+            else {
+              canvasAspect = videoElement.offsetWidth / videoElement.offsetHeight
+            }
             resizeIOSVideo()
           }
           else {
@@ -97,8 +106,16 @@ module.exports = function DeviceScreenDirective(
           }
           var sx = containerEle.offsetWidth / videoEle.offsetWidth
           var sy = containerEle.offsetHeight / videoEle.offsetHeight
+          if (isLandscape()) {
+            sx = containerEle.offsetWidth / videoEle.offsetHeight
+            sy = containerEle.offsetHeight / videoEle.offsetWidth
+          }
           var scale = Math.min(sx, sy)
-          videoEle.style.transform = `scale(${scale})`
+          var transform = `scale(${scale})`
+          if (isLandscape()) {
+            transform += 'rotate(-90deg)'
+          }
+          videoEle.style.transform = transform
         }
 
 
@@ -128,6 +145,10 @@ module.exports = function DeviceScreenDirective(
             else {
               videoElement.style.display = ''
             }
+          })
+
+          scope.$watch('$parent.device.display.rotation', () => {
+            resizeListener()
           })
           return
         }
@@ -167,7 +188,7 @@ module.exports = function DeviceScreenDirective(
               if (bf.length <= 0) {
                 return
               }
-              if (this.buffered.end(0) - time > 3) {
+              if (this.buffered.end(0) - time > 4) {
                 // eslint-disable-next-line
                 console.log('delay time = ' + (this.buffered.end(0) - time)
                   + ', total run time = ' + (Date.now() - startTime) / 1000)

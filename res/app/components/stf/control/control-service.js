@@ -1,7 +1,6 @@
 var _ = require('lodash')
 
 var iosPoints = {}
-var cacheSession = {}
 
 module.exports = function ControlServiceFactory(
   $upload
@@ -16,20 +15,18 @@ module.exports = function ControlServiceFactory(
   }
 
   function ControlService(target, channel) {
-    var iOSHost = 'http://' + target.serial + ':8100/'
-    var actions = []
-
+    var iOSHost = 'http://' + target.host + ':8100/'
 
     function sendOneWay(action, data) {
       if(target.platform === 'iOS') {
 
+        var isLandscape = function() {
+          return target && target.display && target.display.rotation === 90
+        }
+
         var getStatus = function() {
-          if (cacheSession[iOSHost]) {
-            return Promise.resolve(cacheSession[iOSHost])
-          }
           return $http.get(iOSHost + 'status').then(ret => {
-            cacheSession[iOSHost] = ret.data.sessionId
-            return cacheSession[iOSHost]
+            return ret.data.sessionId
           })
         }
 
@@ -39,8 +36,15 @@ module.exports = function ControlServiceFactory(
           var scale = videoEle.style.transform.substr('scale('.length)
           scale = scale.substr(0, scale.length - 1)
           scale = parseFloat(scale)
-          var offsetX = (rootContainer.offsetWidth - videoEle.offsetWidth * scale) * 0.5
-          var offsetY = (rootContainer.offsetHeight - videoEle.offsetHeight * scale) * 0.5
+          var vw = videoEle.offsetWidth
+          var vh = videoEle.offsetHeight
+          if (isLandscape()) {
+            vw = videoEle.offsetHeight
+            vh = videoEle.offsetWidth
+          }
+
+          var offsetX = (rootContainer.offsetWidth - vw * scale) * 0.5
+          var offsetY = (rootContainer.offsetHeight - vh * scale) * 0.5
           var ret = {
             x: (p.x * rootContainer.offsetWidth - offsetX) / scale,
             y: (p.y * rootContainer.offsetHeight - offsetY) / scale,
@@ -48,14 +52,14 @@ module.exports = function ControlServiceFactory(
           if (ret.x < 0) {
             ret.x = 0
           }
-          if (ret.x > videoEle.offsetWidth) {
-            ret.x = videoEle.offsetWidth
+          if (ret.x > vw) {
+            ret.x = vw
           }
           if (ret.y < 0) {
             ret.y = 0
           }
-          if (ret.y > videoEle.offsetHeight) {
-            ret.y = videoEle.offsetHeight
+          if (ret.y > vh) {
+            ret.y = vh
           }
           return ret
         }
@@ -138,6 +142,15 @@ module.exports = function ControlServiceFactory(
               iosPoints = {}
             }
           }
+        }
+
+        if (action === 'display.rotate') {
+          getStatus().then(sessionId => {
+            $http.post(iOSHost + 'session/' + sessionId + '/orientation',
+              JSON.stringify({orientation: data.rotation === 90 ? 'LANDSCAPE' : 'PORTRAIT'}), {
+                headers: {'Content-Type': 'text/plain'}
+              })
+          })
         }
       } else {
         socket.emit(action, channel, data)
@@ -426,7 +439,6 @@ module.exports = function ControlServiceFactory(
   }
 
   controlService.create = function(target, channel) {
-    cacheSession = {}
     iosPoints = {}
     return new ControlService(target, channel)
   }

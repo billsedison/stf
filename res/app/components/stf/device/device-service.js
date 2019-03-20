@@ -9,14 +9,22 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
     return $http.get('http://' + device.host + ':8100/device')
   }
 
+  function fetchIOSOrientation(device) {
+    return $http.get('http://' + device.host + ':8100/status').then(ret => {
+      return $http.get(`http://${device.host}:8100/session/${ret.data.sessionId}/orientation`)
+    })
+  }
+
   function Tracker($scope, options) {
     var devices = []
     var devicesBySerial = Object.create(null)
     var scopedSocket = socket.scoped($scope)
     var digestTimer, lastDigest
+    var iosInterval = null
 
     $scope.$on('$destroy', function() {
       clearTimeout(digestTimer)
+      clearInterval(iosInterval)
     })
 
     function digest() {
@@ -205,6 +213,28 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
     }
 
     this.devices = devices
+
+    /**
+     * mock web socket notify ios device rotation
+     */
+    iosInterval = setInterval(() => {
+      this.devices.forEach(device => {
+        if (device.platform !== 'iOS') { // we don't care android device
+          return
+        }
+
+        fetchIOSOrientation(device).then(r => {
+          var rotation = r.data.value === 'LANDSCAPE' ? 90 : 0
+          if (device.display && device.display.rotation === rotation) { // same, ignore
+            return
+          }
+          device.display = {
+            rotation
+          }
+          changeListener({data: device})
+        })
+      })
+    }, 1000)
   }
 
   Tracker.prototype = new EventEmitter()
