@@ -2,6 +2,12 @@ var oboe = require('oboe')
 var _ = require('lodash')
 var EventEmitter = require('eventemitter3')
 
+var IOS_ORIENTATION_MAP = {
+  'PORTRAIT': 0,
+  'LANDSCAPE': 90, 'UIA_DEVICE_ORIENTATION_LANDSCAPERIGHT': 270,
+  'UIA_DEVICE_ORIENTATION_PORTRAIT_UPSIDEDOWN': 180
+}
+
 module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceService) {
   var deviceService = {}
 
@@ -130,6 +136,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
               device.present = true
               device.usable = true
               device.version = response.data.version
+              device.product = response.data.product
               event.data.ready = true
               event.data.present = true
               event.data.usable = true
@@ -160,6 +167,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
                 event.data.present = true
                 event.data.usable = true
                 event.data.version = response.data.version
+                event.data.product = response.data.product
                 setTimeout(() => {
                   insert(event.data)
                   notify(event)
@@ -224,7 +232,12 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
         }
 
         fetchIOSOrientation(device).then(r => {
-          var rotation = r.data.value === 'LANDSCAPE' ? 90 : 0
+
+
+          var rotation = 0
+          if (IOS_ORIENTATION_MAP.hasOwnProperty(r.data.value)) {
+            rotation = IOS_ORIENTATION_MAP[r.data.value]
+          }
           if (device.display && device.display.rotation === rotation) { // same, ignore
             return
           }
@@ -307,6 +320,8 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
                 device.ready = true
                 device.present = true
                 device.usable = true
+                device.version = res.data.version
+                device.product = res.data.product
                 device.display = {
 
                 }

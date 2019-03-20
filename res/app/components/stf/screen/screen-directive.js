@@ -78,7 +78,9 @@ module.exports = function DeviceScreenDirective(
         var parentAspect = 1
 
         function isLandscape() {
-          return device && device.display && device.display.rotation === 90
+          return device && device.display && (
+            device.display.rotation === 90 || device.display.rotation === 270
+          )
         }
 
         function resizeListener() {
@@ -112,9 +114,7 @@ module.exports = function DeviceScreenDirective(
           }
           var scale = Math.min(sx, sy)
           var transform = `scale(${scale})`
-          if (isLandscape()) {
-            transform += 'rotate(-90deg)'
-          }
+          transform += `rotate(-${device.display.rotation}deg)`
           videoEle.style.transform = transform
         }
 
