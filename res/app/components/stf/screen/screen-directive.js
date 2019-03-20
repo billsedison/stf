@@ -144,7 +144,9 @@ module.exports = function DeviceScreenDirective(
               enableStashBuffer: false,
               lazyLoad: false,
               fixAudioTimestampGap: false,
-              enableWorker: true
+              accurateSeek: true,
+              autoCleanupSourceBuffer: true,
+              enableWorker: true,
             })
             flvPlayer.attachMediaElement(videoElement)
             flvPlayer.load()
@@ -153,7 +155,27 @@ module.exports = function DeviceScreenDirective(
             flvPlayer.on(flvjs.Events.METADATA_ARRIVED, () => {
               setTimeout(() => resizeListener(), 100)
             })
+            flvPlayer.on(flvjs.Events.MEDIA_INFO, () => {
+              setTimeout(() => resizeListener(), 100)
+            })
             setTimeout(() => resizeListener(), 100)
+
+            var startTime = Date.now()
+            videoElement.addEventListener('progress', function() {
+              var bf = this.buffered
+              var time = this.currentTime
+              if (bf.length <= 0) {
+                return
+              }
+              if (this.buffered.end(0) - time > 3) {
+                // eslint-disable-next-line
+                console.log('delay time = ' + (this.buffered.end(0) - time)
+                  + ', total run time = ' + (Date.now() - startTime) / 1000)
+                // eslint-disable-next-line
+                console.log('adjust timeline to last frame')
+                this.currentTime = this.buffered.end(0) - 0.05
+              }
+            })
           }
         }
 
