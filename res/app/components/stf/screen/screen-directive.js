@@ -158,7 +158,7 @@ module.exports = function DeviceScreenDirective(
             flvPlayer.on(flvjs.Events.MEDIA_INFO, () => {
               setTimeout(() => resizeListener(), 100)
             })
-            setTimeout(() => resizeListener(), 100)
+            setTimeout(() => resizeListener(), 1000)
 
             var startTime = Date.now()
             videoElement.addEventListener('progress', function() {
