@@ -163,7 +163,23 @@ module.exports = function ControlServiceFactory(
             iosPoints[pointIndex].over = true
             var left = _.filter(iosPoints, pp => pp.over)
             if (left.length === size) {
-              // TODO here process ios multiple drag
+
+              var distance = function(p, e) {
+                return Math.sqrt((p.x - e.x) * (p.x - e.x) + (p.y - e.y) * (p.y - e.y))
+              }
+              var path1 = iosPoints[0]
+              var path2 = iosPoints[1]
+              var d1 = distance(path1.p, path2.p)
+              var d2 = distance(path2.e, path1.e)
+              var scale = 1 + d2 - d1
+              var v = ((path1.e.timestamp - path1.p.timestamp) / 1000) * (scale < 1 ? -1 : 1) * 2
+              console.log('pinch, scale = ' + scale + ', velocity' + v)
+              getStatus().then(sessionId => {
+                $http.post(iOSHost + 'session/' + sessionId + '/wda/pinch',
+                  JSON.stringify({velocity: v, scale: scale}), {
+                    headers: {'Content-Type': 'text/plain'}
+                  })
+              })
               iosPoints = {}
             }
           }
