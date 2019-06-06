@@ -38,8 +38,10 @@
       li.screenshots-icon-item(ng-repeat='shot in screenshots').cursor-select
         h5 {{ device.name }}
         h6 {{ shot.body.date | date:'HH:mm:ss' }}
-        a(ng-href='{{ shot.body.href }}', target='_blank')
+        a(ng-href='{{ shot.body.href }}', target='_blank', ng-if="device.platform !== 'iOS'")
           img(ng-src='{{ shot.body.href + shotSizeParameter(480, 1) }}',
           ng-srcset='{{ shot.body.href + shotSizeParameter(480, 2) }} 2x').screenshot-image
+        a(href="javascript:;", ng-click="open(shot.body.href)" ng-if="device.platform === 'iOS'")
+          img(data-ng-src='{{ shot.body.href }}' width="{{getIOSImageWidth(480,1)}}").screenshot-image
 
     .clearfix
