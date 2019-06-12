@@ -17,6 +17,12 @@ module.exports = function ControlServiceFactory(
   function ControlService(target, channel) {
     var iOSHost = 'http://' + target.host + ':8100/'
 
+    var getStatus = function() {
+      return $http.get(iOSHost + 'status').then(ret => {
+        return ret.data.sessionId
+      })
+    }
+
     function sendOneWay(action, data) {
       if(target.platform === 'iOS') {
         target.display = target.display || {}
@@ -30,13 +36,6 @@ module.exports = function ControlServiceFactory(
         var isIpad = function() {
           return target && target.product && target.product.indexOf('iPad') >= 0
         }
-
-        var getStatus = function() {
-          return $http.get(iOSHost + 'status').then(ret => {
-            return ret.data.sessionId
-          })
-        }
-
         var rootContainer = document.getElementById('screen-container')
         var videoEle = document.getElementById('screenshot')
         var cordConvert = (p) => {
@@ -184,7 +183,9 @@ module.exports = function ControlServiceFactory(
             }
           }
         }
-
+        else if (action === 'input.keyPress') {
+          $http.post(iOSHost + 'keyPress?key=' + data.key)
+        }
         if (action === 'display.rotate') {
           getStatus().then(sessionId => {
             $http.post(iOSHost + 'session/' + sessionId + '/orientation',
@@ -199,9 +200,28 @@ module.exports = function ControlServiceFactory(
     }
 
     function sendTwoWay(action, data) {
-      var tx = TransactionService.create(target)
-      socket.emit(action, channel, tx.channel, data)
-      return tx.promise
+      if (target.platform === 'iOS') {
+        if (action === 'device.reboot') {
+          return $http.post('/api/v1/devices/rebootDevice?name=' + target.serial)
+        }
+        else if (action === 'screen.capture') {
+          return new Promise((resolve) => {
+            return $http.get(iOSHost + 'deviceSS').then(rsp => {
+              resolve({
+                body: {
+                  date: new Date(),
+                  href: 'data:image/jpeg;base64,' + rsp.data
+                }
+              })
+            })
+          })
+        }
+      }
+      else {
+        var tx = TransactionService.create(target)
+        socket.emit(action, channel, tx.channel, data)
+        return tx.promise
+      }
     }
 
     function keySender(type, fixedKey) {

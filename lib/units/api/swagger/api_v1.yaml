@@ -234,6 +234,31 @@ paths:
             $ref: "#/definitions/ErrorResponse"
       security:
         - accessTokenAuth: []
+  /devices/rebootDevice:
+    x-swagger-router-controller: devices
+    post:
+      summary: reboot device
+      description: reboot ios device
+      operationId: rebootDeviceByName
+      tags:
+        - devices
+      parameters:
+        - name: name
+          in: query
+          description: the device name
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Device Information
+          schema:
+            $ref: "#/definitions/DeviceResponse"
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+      security:
+        - accessTokenAuth: []
   /devices/{serial}:
     x-swagger-router-controller: devices
     get:
