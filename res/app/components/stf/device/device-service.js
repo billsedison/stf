@@ -11,19 +11,14 @@ var IOS_ORIENTATION_MAP = {
 
 module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceService) {
   var deviceService = {}
-  var iosSessionCache = {}
   function fetchIOSDevice(device) {
     return $http.get('http://' + device.host + ':8100/device', {timeout: 5 * 1000})
   }
 
   function fetchIOSOrientation(device) {
     var host = device.host
-    if (iosSessionCache[host]) {
-      return $http.get(`http://${host}:8100/session/${iosSessionCache[host]}/orientation`)
-    }
     return $http.get('http://' + host + ':8100/status').then(ret => {
-      iosSessionCache[host] = ret.data.sessionId
-      return $http.get(`http://${host}:8100/session/${iosSessionCache[host]}/orientation`)
+      return $http.get(`http://${host}:8100/session/${ret.data.sessionId}/orientation`)
     })
   }
 
