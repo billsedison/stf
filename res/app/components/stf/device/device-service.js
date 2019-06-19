@@ -8,16 +8,22 @@ var IOS_ORIENTATION_MAP = {
   'UIA_DEVICE_ORIENTATION_PORTRAIT_UPSIDEDOWN': 180
 }
 
+
 module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceService) {
   var deviceService = {}
-
+  var iosSessionCache = {}
   function fetchIOSDevice(device) {
-    return $http.get('http://' + device.host + ':8100/device')
+    return $http.get('http://' + device.host + ':8100/device', {timeout: 5 * 1000})
   }
 
   function fetchIOSOrientation(device) {
-    return $http.get('http://' + device.host + ':8100/status').then(ret => {
-      return $http.get(`http://${device.host}:8100/session/${ret.data.sessionId}/orientation`)
+    var host = device.host
+    if (iosSessionCache[host]) {
+      return $http.get(`http://${host}:8100/session/${iosSessionCache[host]}/orientation`)
+    }
+    return $http.get('http://' + host + ':8100/status').then(ret => {
+      iosSessionCache[host] = ret.data.sessionId
+      return $http.get(`http://${host}:8100/session/${iosSessionCache[host]}/orientation`)
     })
   }
 
@@ -137,6 +143,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
               device.usable = true
               device.version = response.data.version
               device.product = response.data.product
+              event.data._name = response.data.provider.name
               event.data.ready = true
               event.data.present = true
               event.data.usable = true
@@ -168,6 +175,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
                 event.data.usable = true
                 event.data.version = response.data.version
                 event.data.product = response.data.product
+                event.data._name = response.data.provider.name
                 setTimeout(() => {
                   insert(event.data)
                   notify(event)
@@ -247,7 +255,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
           changeListener({data: device})
         })
       })
-    }, 1000)
+    }, 2*1000)
   }
 
   Tracker.prototype = new EventEmitter()
@@ -322,6 +330,7 @@ module.exports = function DeviceServiceFactory($http, socket, EnhanceDeviceServi
                 device.usable = true
                 device.version = res.data.version
                 device.product = res.data.product
+                device._name = res.data.provider.name
                 device.display = {
 
                 }
