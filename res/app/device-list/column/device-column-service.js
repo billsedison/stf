@@ -36,7 +36,7 @@ module.exports = function DeviceColumnService($filter, gettext) {
   , name: DeviceNameCell({
       title: gettext('Product')
     , value: function(device) {
-        return device.name || device.model || device.serial
+        return device.product || device.name || device.model || device.serial
       }
     })
   , operator: TextCell({
@@ -170,7 +170,7 @@ module.exports = function DeviceColumnService($filter, gettext) {
   , serial: TextCell({
       title: gettext('Serial')
     , value: function(device) {
-        return device.serial || ''
+        return device.uuid || device.serial || ''
       }
     })
   , manufacturer: TextCell({
@@ -250,6 +250,7 @@ module.exports = function DeviceColumnService($filter, gettext) {
   , batteryStatus: TextCell({
       title: gettext('Battery Status')
     , value: function(device) {
+      console.log('Battery Status filter ==', $filter('translate'))
         return device.battery
           ? $filter('translate')(device.enhancedBatteryStatus)
           : ''
@@ -269,7 +270,7 @@ module.exports = function DeviceColumnService($filter, gettext) {
   , batteryTemp: NumberCell({
       title: gettext('Battery Temp')
     , value: function(device) {
-        return device.battery ? device.battery.temp : null
+        return device.battery && !Number.isNaN(Number(device.battery.temp)) ? device.battery.temp : null
       }
     , format: function(value) {
         return value === null ? '' : value + '°C'
